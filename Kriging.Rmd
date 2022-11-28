@@ -1,0 +1,1057 @@
+---
+title: "pm 2.5"
+author: "Matteo Lenoci"
+output:
+  rmdformats::downcute: default
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE} 
+knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
+```
+
+Dataset proveniente da: US Environmental Protection Agency - **EPA**
+
+I dati che analizzeremo provengono dall'EPA Air Quality System - **AQS**. I siti sono presenti su tutto il territorio americano, le agenzie che li raccolgono li inviano all'EPA che li aggrega e li inserisce nel database.
+
+I dati sono stati raccolti da Google BigQuery e messi a disposizione su Kaggle.
+
+https://www.kaggle.com/epa/air-quality
+
+
+# Introduzione Dataset
+
+Come intuibile dalle prime righe quest'analisi si propone di analizzare un dataset che raccoglie le informazioni sulla qualità dell'aria da diversi siti lungo tutto il territorio degli Stati Uniti d'America.
+
+Lo scopo sarà quello di utilizzare il predittore Kriging.
+
+il dataset contiene una mole rilevante di informazioni, come sappiamo, in questi casi, non tutte sono complete e spesso sono anche effettuate con misurazioni differenti, a questo proposito faremo una selezione opportuna.
+
+Di seguito vediamo l'elenco di tutte le variabili con una breve descrizione: 
+
+-State Code: codice FIPS dello Stato dove risiede la centralina di misurazione.
+
+-County Code: codice FIPS della "contea".
+
+-Site Num: identificatore unico della centralina.
+
+-Parameter Code: codice AQS che corrisponde al parametro misurato.
+
+-POC: “Parameter Occurrence Code” usato per distinguere diversi strumenti che misurano lo stesso parametro sullo stesso sito.
+
+-Latitude del sito.
+
+-Longitude del sito.
+
+-Datum: datum geodetico.
+
+-Parameter Name: nome del parametro misurato associato al codice AQS, può essere inquinante o non inquinante.
+
+-Sample Duration: il "tempo di misurazione", indica per quanto tempo l'aria passa e viene raccolta attraverso un filtro prima di effettuare la misurazione. (1 ora, 24 ore, continuo).
+
+-Pollutant Standard: una descrizione dello standard di qualità dell'aria, in termini di regole usate per accomunare i dati.
+
+-Metric Used: tipo di misurazione
+
+-Method Name: breve descrizione del metodo, strumentazione e protocolli usati per raccogliere il sample.
+
+-Year: Anno di riferimento della misurazione.
+
+-Units of Measure: unità di misura. L'immissione è permessa in qualsiasi tipo di unità di misura, l'EPA converte i dati in un unità di misura standard proprio per permettere un uso a fini statistici.
+
+-Event Type: variabile che indica se quella misurazione fa riferimento ad un evento eccezionale, esempio un incendio. "No events" indica condizioni normali, "eventes included" che l'evento è stato incluso nella misurazione, "events excluded" indica che l'evento è avvenuto ma la misurazione sarà presente in più formati per considerarlo ed escluderlo, ci saranno quindi in questo caso più record sulla stessa misurazione.
+
+-Observation Count: il numero di sample presi durante l'anno.
+
+-Observation Percent: dato presente solo ove richiesto un determinato numero di osservazioni annuali, indica la percentuale di dati raccolti effettivi rispetto ai previsti.
+
+-Completeness Indicator: indica se i criteri e gli standard per la raccolta del dato siano stati rispettati oppure non ci sono informazioni in merito. Y/N.
+
+-Valid Day Count: numero di giorni dove i criteri di raccolta sono stati rispettati nell'anno, è un riassunto dei giorni validi.
+
+-Required Day Count: numero di giorni nei quali era stata prevista la raccolta del dato.
+
+-Exceptional Data Count: numero di giorni in cui ci sono state condizioni eccezionali che incidevano sulla qualità dell'aria (non si parla di eventi come incendio ma soltanto casistiche fuori norma).
+
+-Null Data Count: numero di sample previsti ma non raccolti, con motivazione.
+
+-Primary Exceedance Count: numero di sample durante l'anno che hanno ecceduto il primo standard di qualità dell'aria.
+
+-Secondary Exceedance Count: numero di sample durante l'anno che hanno ecceduto il secondo standard di qualità dell'aria.
+
+-Certification Indicator: indicazione sullla completezza e accuratezza dell'informazione sul dato riassunto annuale, se insomma è stato certificato o meno dal submitter. Ove troviamo la dicitura "Certification not required" significa che il parametro non richiede la certificazione oppure non è ancora stata superata la deadline per certificarlo. In alternativa è presente la certificazione o non presente. L'ultima opzione è "certification denied", significa che l'EPA non ha concesso la certificazione.
+
+-Num Obs Below MDL: numero di sample raccolti e registrati nell'anno al di sotto della soglia MDL method detection limiti dello strumento di misurazione
+
+-Arithmetic Mean: media dell'anno.
+
+-Arithmetic Standard Dev: standard dev dell'anno.
+
+-1st Max Value: valore più alto dell'anno.
+
+-1st Max DateTime: data e orario del primo valore più alto dell'anno.
+
+-2nd Max Value: secondo valore più alto dell'anno.
+
+-2nd Max DateTime: data e orario del secondo valore più alto dell'anno.
+
+-3rd Max Value: terzo valore più alto dell'anno.
+
+-3rd Max DateTime: data e orario del terzo valore più alto dell'anno.
+
+-4th Max Value: quarto valore più alto dell'anno.
+
+-4th Max DateTime: data e orario del quarto valore più alto dell'anno.
+
+-1st Max Non Overlapping Value: sulla media di 8 ore di osservazione, il valore più alto dell'anno.
+
+-1st NO Max DateTime: data e orario del precedente campo.
+
+-2nd Max Non Overlapping Value: sulla media di 8 ore, secondo valore più alto dell'anno (non si accavalla col precedente).
+
+-2nd NO Max DateTime: data e orario del precedente campo.
+
+-99th Percentile: il valore sulla stessa centralina per il quale il 99% dei restanti valori misurati nell'anno sono uguali o inferiori.
+
+-98th Percentile: il valore sulla stessa centralina per il quale il 98% dei restanti valori misurati nell'anno sono uguali o inferiori.
+
+-95th Percentile: il valore sulla stessa centralina per il quale il 95% dei restanti valori misurati nell'anno sono uguali o inferiori.
+
+-90th Percentile: il valore sulla stessa centralina per il quale il 90% dei restanti valori misurati nell'anno sono uguali o inferiori.
+
+-75th Percentile: il valore sulla stessa centralina per il quale il 75% dei restanti valori misurati nell'anno sono uguali o inferiori.
+
+-50th Percentile: il valore sulla stessa centralina per il quale il 50% dei restanti valori misurati nell'anno sono uguali o inferiori.(la mediana).
+
+-10th Percentile: il valore sulla stessa centralina per il quale il 10% dei restanti valori misurati nell'anno sono uguali o inferiori.
+
+-Local Site Name: nome dato alla specifica centralina (se è stato dato dallo Stato, dai locali o dalla tribal air pollution conrol agency che lo gestisce).
+
+-Address: indirizzo del sito.
+
+-State Name: nome dello Stato di localizzazione della centralina.
+
+-County Name: nome della contea di localizzazione della centralina.
+
+-City Name: città della centralina, non si riferisce ad aree urbane bensì a confini legali.
+
+-CBSA Name: nome della Metropolitan area di riferimento della centralina.
+
+-Date of Last Change: data dell'ultima modifica al dato nel sistema di dati AQS.
+
+
+# Caricamento Dati
+
+```{r}
+
+rm(list=ls(all=TRUE))
+
+Data <- read.csv("C:/Users/matte/Desktop/tesina/krig/epa_air_quality_annual_summary.csv")
+
+```
+
+Per l'analisi abbiamo effettuato una selezione in modo da avere dati effettivamente presenti, uniformi e coerenti. 
+
+A questo scopo la prima selezione è su un anno specifico, questo scelto casualmente, la selezione successiva passa per il sample duration: 24 ore. Ho scelto 24 ore dato che da una prima analisi risultava tra i più frequenti e uniformi tra i siti; relativamente alla registrazione la selezione va su "Daily mean", successivamente la selezione è andata sul PM2.5; 
+
+il motivo risiede nell'importanza di questo inquinante e nel fatto che abbiamo sufficienti dati a disposizione nel dataset.
+
+Riguardo al metodo di misurazione, è normato nell'Unione Europea secondo la UNI EN 12341:2014. Di massima più il numero è basso, più le polveri sono sottili ed anche più pericolose per la salute della specie umana ed animale; Infatti mentre il PM 10 raggiunge solo i bronchi, la trachea e vie respiratorie superiori, il PM 2,5 è in grado di penetrare negli alveoli polmonari con eventuale diffusione nel sangue. Nelle donne ci sono evidenze che il PM 2,5 venga ad accumularsi nel seno causando il cancro al seno.
+
+Il PM 2,5 è dunque parte di ciò che è definito polveri sottili. Può essere in minima parte di origine naturale ma per gran parte trae origine da attività umane di varia natura, industriali e non. Un esempio sono i freni degli autoveicoli che consumandosi emettono PM 2,5 ma che non sono la fonte del maggiore inquinamento. Può essere di tipo primario o secondario, quando si forma successivamente alla trasformazione chimico-fisica di altre sostanze originarie. Si tratta di una miscela di particelle di proprietà diverse, costituita da polveri minerali ma anche composti come nitrati, solfati, ammoniaca e sali.
+
+Si calcola che per una presenza di PM 2,5 superiore di 10 punti rispetto al massimo consentito vi sia un incremento della probabilità di contrarre il cancro pari al 7%.
+\
+\
+
+la nostra selezione poi passa per lo standard utilizzato per la registrazione nel database AQS, i dati erano presenti ripetuti per due tipologie di standard, ho scelto il "pm25 24-hour 2006".
+
+L'ultimo filtro era quello sul tipo di evento, abbiamo lasciato fuori le misurazioni che prevedevano l'evento "incluso" in quanto avrebbero portato a misurazioni anormali e in ogni caso per lo stesso record è presente anche il dato che esclude l'evento che quindi andiamo a mantenere nel dataset.
+
+successivamente selezioniamo soltanto i dati di interesse all'analisi, cioè longitudine e latitudine e poi la MEDIA cioè l'osservazione che andremo ad analizzare; data la presenza di circa 25 duplicati in termini di siti che portavano una doppia registrazione (valori sempre molto simili) abbiamo utilizzato la media aritmetica per mantere un solo valore ed eliminare i doppioni. 
+
+ci ritroviamo con 433 osservazioni.
+
+il primo passo sarà quello di definire i dati ottenuti as.geodata()
+
+nei comandi c'è commentato anche l'esempio di utilizzo, per lo stesso scopo, della funzione SpatialPointsDataFrame(), la scrittura relativa alla specifica proj4string() fa riferimento ad una formattazione delle coordinate. Ho continuato con il metodo classico visto in aula per successiva compatibilità coi comandi utilizzati. 
+
+
+
+```{r}
+
+library(dplyr)
+library(scatterplot3d)
+library(sgeostat)
+library(geoR)
+library(ggplot2)
+library(akima)
+
+data1<- Data %>%
+  filter(year==2000)%>%
+  filter(sample_duration=="24 HOUR")%>%
+  filter(metric_used=="Daily Mean")%>%
+  filter(parameter_name=="PM2.5 - Local Conditions")%>%
+  filter(pollutant_standard=="PM25 24-hour 2006")%>%
+  filter(event_type!="Events Inclucded")
+
+datadef<- data1 %>% 
+  select(longitude,latitude,arithmetic_mean)
+
+
+#rimozione duplicati con media aritmetica
+
+datadef<-datadef %>% group_by(latitude) %>% mutate_each(funs(mean)) %>% distinct()
+
+
+datadef<-as.data.frame(datadef)
+colnames(datadef) <- c("X","Y","data")
+
+datadef<-as.geodata(datadef,coords.col = 1:2)
+
+
+#xy <- datadef[,c(1,2)]
+#spdf <- SpatialPointsDataFrame(coords = xy, data = datadef,
+#                               proj4string = CRS("+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0"))
+
+```
+# Analisi Esplorativa
+
+possiamo adesso vedere un summary della nostra distribuzione di media, delle coordinate e poi disegnare un istogramma con la funzione di densità
+
+
+```{r}
+str(datadef)
+summary(datadef)
+
+
+
+ggplot(data1, aes(x = arithmetic_mean)) + 
+  geom_histogram(aes(y = ..density..),
+                 colour = 1, fill = "white") +
+  geom_density(lwd = 1.2,
+               linetype = 2,
+               colour = 2)+
+  theme_bw()
+
+
+```
+
+la normalità dei dati non sembra essere confermata come potevamo immaginare, proseguiamo con un tentativo di trasformata di Box-Cox selezionando il miglior lambda attraverso la funzione dedicata boxcoxit()
+
+la trasformata di box cox andrà ad effettuare la seguente operazione sui nostri dati sulla base del $\lambda$ scelto.
+
+$$
+\left \{ \begin{array}{rl}
+\frac{y^{\lambda}-1}{y}\;\;\;\;if\;\lambda\neq0\\
+log\;y\;\;\;\;\; if\;\lambda=0
+\end{array}
+\right.
+$$
+
+La trasformata di Box-Cox viene utilizzata per ridurre la non stazionarietà in varianza, la usiamo con lo scopo di avvicinare maggiormente i nostri dati alla distribuzione normale.
+
+```{r}
+boxcoxfit(datadef$data)
+
+datadef$data<-BCtransform(datadef$data, 0.9083075)
+
+datadef$data<-as.numeric(unlist(datadef$data))
+
+
+hist(datadef$data, freq=FALSE, breaks=30)
+lines(density(datadef$data), col="red")
+```
+
+la trasformata possiamo vedere come abbia fatto poca differenza, d'altronde dalla formula di box cox ci accorgiamo che per un $\lambda$ pari ad 1 non cambiamo alcunchè, il nostro valore selezionato dalla procedura è 0.90.
+
+procediamo comunque con l'analisi.
+
+\
+\
+
+visualizziamo i dati:
+
+il primo riquadro in alto a sx è il risultato dell'uso della library Scatterplot3D, altrimenti avremmo al suo posto un'istogramma.
+
+possiamo aggiungere poi una rappresentazione dei dati rispetto a x e y evidenziando il valore della nostra media suddiviso per quantili a colori.
+
+```{r}
+par(mfrow=c(1,1), pty='s')
+plot(datadef, scatter3d=TRUE, highlight=TRUE)
+
+points(datadef, pt.divide = "quintile", xlab = "Coord X", ylab = "Coord Y")
+
+```
+
+Ci accorgiamo in particolare sulla cordinata x di un raggruppamento che tende ad avere un andamento, lo stesso sulla coordinata y anche se in maniera meno marcata. sottlineiamo anche come già da ora possiamo immaginare che il variogramma empirico potrà avere difficoltà con le distanze più elevate, ricordiamo che stiamo parlando di tutto il territorio americano comprese delle isole e delle zone dell'Alaska, a distanze elevate abbiamo pochissimi siti a disposizione.
+
+sicuramente valori più alti del fenomeno si osservano in aree a densità di popolazione elevata come si può vedere in maniera chiara dal secondo plot e ricordando la mappa del territorio americano.
+
+
+A tal proposito andiamo a disegnare la nuvola del variogramma e poi per l'appunto il variogramma campionario, nel secondo caso vediamo i valori segnati in rosso ottenuti da una suddivisione per classi di distanze al quale poi si applica la media.
+
+l'ultimo grafico dei 3 è una rappresentazione alternativa che mostra dei boxplot sempre divisi in classi di distanza definite da noi nel seq(), simile al precedente ma meno chiaro.
+
+
+```{r}
+
+
+par(mfrow=c(1,2),pty='s')
+cloud<-variog(datadef,option="cloud")
+plot(cloud,main='nuvola del variogramma',pch='.',cex=0.8)
+
+plot(cloud,main='Variogramma campionario',pch='*')
+cloud.bin<-variog(datadef,option="bin")
+points(cloud.bin$u,cloud.bin$v,pch=19,col=2)
+abline(v=cloud.bin$bins.lim)
+
+
+option2 <- variog(datadef,uvec = seq(0,100,10), bin.cloud = T)
+plot(option2, bin.cloud = T, main = "classical estimator")
+
+
+```
+
+notiamo un andamento che tenderebbe a stabilizzarsi dopo la distanza 20 segnata sul grafico ma a distanze più elevate riprende, come detto dobbiamo considerare con i giusti dubbi l'affidabilità delle distanze molto ampie considerando il tipo di fenomeno che stiamo analizzando, il tipo di dato e per l'appunto l'ampiezza del territorio oggetto d'osservazione.
+
+un passaggio successivo è quello di verificare l'ipotesi di isotropia, è chiaro che siamo di fronte molto probabilmente ad un fenomeno anisotropico, in ogni caso fatta questa premessa procediamo con l'analisi.
+
+```{r}
+
+par(mfrow=c(1,1),pty='s')
+
+data.anis<-variog4(datadef)
+plot(data.anis)
+title(main='Variogramma campionario: N-S, NE-SW, E-W, SE-NW')
+
+```
+\
+\
+\
+
+
+utilizziamo ora il comando Persp per fare un'interpolazione sul piano d'interesse, questo comando utilizza il predittore spline, possiamo vederlo come un Kriging che utilizza dei parametri predefiniti, ci restituirà quindi il fenomeno osservato su tutto il piano delle coordinate in quanto parliamo di un fenomeno spazialmente continuo. 
+
+prima di lanciarlo però creiamo una palette di colori che sarà basata sulla z per dare un senso migliore delle 3 dimensioni al grafico, utilizziamo in particolare la funzione ColorRampPalette() e cut() per creare degli intervalli che rappresenteranno i colori. 
+
+
+
+```{r}
+library(fields)
+
+data.interpolazione<-interp(datadef$coords[,1],datadef$coords[,2],datadef$data)
+
+
+jet.colors <- colorRampPalette( c("green","blue","red"))
+
+
+nbcol <- 100
+color <- jet.colors(nbcol)
+
+z1<-data.interpolazione$z
+
+nrz <- nrow(z1)
+ncz <- ncol(z1)
+zfacet <- z1[-1, -1] + z1[-1, -ncz] + z1[-nrz, -1] + z1[-nrz,-ncz] 
+
+facetcol <- cut(zfacet, nbcol)
+
+
+persp(data.interpolazione$x,data.interpolazione$y,data.interpolazione$z,xlab="x",ylab="y",zlab="z", col=color[facetcol],  theta=40,
+    phi=20,expand=0.3,ltheta = 20, shade = 0.9, ticktype = "simple", main="Perspective plot",box=TRUE)
+
+
+
+```
+
+dai risultati possiamo vedere un certo trend, non eccessivamente marcato e anche una fonte di erraticità nella zona centrale (relativa per l'appunto agli stati più densamente popolati degli Stati Uniti d'America)
+
+# Trend
+
+## Fit del Trend
+
+quello che andremo a fare ora, partendo dalla scomposizione del Kriging è fittare un trend, possiamo già immaginare un trend del primo o del secondo ordine come sufficienti, andremo comunque a provare trend fino al terzo ordine analizzando i residui per scegliere quello che si adatta meglio. 
+
+L'obiettivo sarà ricercare le condizioni di correlazione nei residui in quanto il trend andrà a cogliere la variabilità di larga scala e l'effettiva previsione si baserà sui residui che comprenderanno la variabilità di piccola scala, micro scala e la variabilità dell'errore che vogliamo sia un processo white noise.
+
+il nostro processo sarà visto quindi come la somma di due componenti:
+
+$$
+Z=D\beta\;+\;\delta(s)
+$$
+
+dove:
+
+$$
+\delta(s)=\omega(s)+\eta(s)+\epsilon(s)
+$$
+
+
+
+
+**trend primo ordine**
+
+```{r}
+x<-datadef$coords[,1]
+y<-datadef$coords[,2]
+z<-datadef$data
+trend.fit1<-lm(z~x+y)
+summary(trend.fit1)
+```
+Valori tutti significativi, dall'$R^2$ ci accorgiamo che utilizzando questo trend andremmo a spiegare all'incirca il 20% della variabilità dalla componente deterministica.
+
+rappresentiamolo sempre con l'utilizzo del comando persp(), andando a fare una predizione dei valori con il comando predict() attraverso il modello stimato sulla griglia costruita precedentemente.
+
+andiamo quindi a rappresentare quanto contenuto nella parte deterministica $D*\beta$
+
+```{r}
+
+
+xgrid<-seq(min(datadef$coords[,1]),max(datadef$coords[,1]),length=40)
+ygrid<-seq(min(datadef$coords[,2]),max(datadef$coords[,2]),length=40)
+data.grid<- expand.grid(x=xgrid,y=ygrid)
+
+
+superfice1<-predict(trend.fit1,newdata=data.grid)
+
+persp(xgrid,ygrid,matrix(superfice1,40,40),xlab="x",ylab="y",zlab="z",theta=40,
+      phi=20,expand=0.3, col = "#03B6C6",ltheta = 20, shade = 0.2, ticktype = "simple",
+      main="Perspective plot",box=TRUE)
+
+
+```
+
+**trend secondo ordine**
+
+
+```{r}
+trend.fit2<-lm(z~x+y+I(x^2)+I(y^2)+x*y)
+summary(trend.fit2)
+
+superfice2<-predict(trend.fit2,newdata=data.grid)
+
+persp(xgrid,ygrid,matrix(superfice2,40,40),xlab="x",ylab="y",zlab="",theta=60,
+      phi=20,expand=0.3, col = "#03B6C6",ltheta = 20, shade = 0.2, ticktype = "simple",
+      main="Trend parabolico",box=TRUE)
+
+```
+l'intercetta perde un pò di significatività ma i parametri restano tutti molto significativi. Con questo trend, sempre nell'ottica dell'$R^2$ andremmo ad operare con circa il 70% della variabilità residua per il predittore kriging.
+
+
+**trend terzo ordine**
+
+```{r}
+trend.fit3<-lm(z~x+y+I(x^2)+I(y^2)+x*y+I(x^3)+I(y^3)+I(x^2)*y+I(y^2)*x)
+summary(trend.fit3)
+
+
+superfice3<-predict(trend.fit3,newdata=data.grid)
+
+persp(xgrid,ygrid,matrix(superfice3,40,40),xlab="x",ylab="y",zlab="",theta=60,
+      phi=20,expand=0.3, col = "#03B6C6",ltheta = 20, shade = 0.2, ticktype = "simple",
+      main="cubico",box=TRUE)
+
+
+```
+
+qui notiamo che alcuni parametri perdono di significatività e in generale il valore del p value aumenta per tutti. l'indice R^2 cresce ma non della stessa entità che abbiamo visto passando da un trend del primo ad un trend del secondo ordine.
+\
+\
+\
+
+
+Per effettuare la scelta più appropriata vediamo l'analisi dei residui, lo scopo primario sarà quello di trovare una correlazione spaziale in essi. 
+
+Nella logica del kriging, una volta sottratto il trend di fondo abbiamo tolto "la media" del fenomeno, ci aspettiamo quindi dei residui tra loro correlati in quanto espressione della dipendenza spaziale; 
+
+è uno scopo ovviamente diverso da quello che normalmente si fa nella regressione "classica", qui se dovessimo osservare residui che sono incorrelati che rispecchiano tutte le ipotesi di base di Gauss-Markov del modello di regressione significherebbe che abbiamo spiegato tutta la variabilità dei nostri dati con il trend o in ogni caso che non avremmo una correlazione spaziale da poter analizzare e ci troviamo di fronte ad un white noise.
+
+## Residui
+
+*analisi residui trend* 
+
+```{r}
+library(ggfortify)
+library(gridExtra)
+
+
+res.primo<-trend.fit1$residuals
+
+res.secondo<-trend.fit2$residuals
+
+res.terzo<-trend.fit3$residuals
+
+summary(res.primo)
+summary(res.secondo)
+summary(res.terzo)
+
+
+a1<-ggplot() +
+  geom_histogram(aes(x= res.primo, y = stat(density)),color="darkblue", fill="lightblue") +
+  stat_function(
+    fun = dnorm, 
+    args = list(mean = mean(res.primo), sd = sd(res.primo)), 
+    lwd = 2, 
+    col = 'red'
+  )+
+  labs(title="Residui trend primo ordine")
+
+
+a2<-ggplot() +
+  geom_histogram(aes(x= res.secondo, y = stat(density)),color="darkblue", fill="lightblue") +
+  stat_function(
+    fun = dnorm, 
+    args = list(mean = mean(res.secondo), sd = sd(res.secondo)), 
+    lwd = 2, 
+    col = 'red'
+  )+
+  labs(title="Residui trend secondo ordine")
+
+a3<-ggplot() +
+  geom_histogram(aes(x= res.terzo, y = stat(density)),color="darkblue", fill="lightblue") +
+  stat_function(
+    fun = dnorm, 
+    args = list(mean = mean(res.terzo), sd = sd(res.terzo)), 
+    lwd = 2, 
+    col = 'red'
+  )+
+  labs(title="Residui trend terzo ordine")
+
+plots1.1<-(list(a1,a2,a3))
+marrangeGrob(plots1.1, nrow = 3, ncol=1)
+
+
+```
+
+le tre distribuzioni sono messe a confronto con una curva di densità di una normale, nessuna delle 3 sembra approssimarsi in maniera adeguata.
+
+passiamo a vedere i classici grafici utili all'interpretazione dei residui per poi fare i vari test più noti.
+
+```{r}
+
+autoplot(trend.fit1)
+autoplot(trend.fit2)
+autoplot(trend.fit3)
+
+```
+nessuno dei 3 modelli mostra un'evidente correlazione o un chiaro trend, i residui risultano molto concentrati nel primo e secondo risultato, il trend del terzo ordine sembra in ogni caso il meno adatto al nostro scopo. Tutti e 3 i gruppi di plot mostrano qualche punto ad alto leverage.  
+
+\
+
+procediamo ai test specifici per avere una definizione più chiara dei nostri residui.
+
+*Jarque-Bera*
+
+```{R}
+library(tseries)
+
+
+jarque.bera.test(res.primo)
+jarque.bera.test(res.secondo)
+jarque.bera.test(res.terzo)
+
+```
+nessuno dei 3 risultati ci conferma l'ipotesi di normalità dei nostri residui.
+
+*Breush-Pagan*
+
+Verifica dell'eteroschedasticità, da premettere che questo test è affidabile solo quando siamo in presenza della normalità dei nostri dati dato che il test di Breusch-Pagan è molto sensibile asintoticamente alla curtosi, ipotesi quindi non confermata nel nostro caso.
+
+```{r}
+library(lmtest)
+
+bptest(trend.fit1)
+bptest(trend.fit2)
+bptest(trend.fit3)
+
+```
+siamo in presenza di eteroschedasticità in tutti e 3 i casi.
+
+*Durbin-Watson*
+
+passiamo a vedere la presenza o meno di autocorrelazione
+
+```{r}
+
+dwtest(trend.fit1, alternative="greater")
+dwtest(trend.fit2, alternative="greater")
+dwtest(trend.fit3, alternative="greater")
+
+```
+anche in questo caso il risultato della statistica è molto vicino a 2, indicando l'assenza di autocorrelazione.
+
+
+
+## Conclusione e scelta trend
+
+possiamo concludere che i risultati non sono per nulla convincenti, provando a dare una spiegazione probabilmente sono dovuti al fatto che parliamo di medie annuali e quindi non completamente affidabili per quest'analisi, inoltre sappiamo benissimo quanto gli inquinanti siano sensibili molto anche alle condizioni meteorologiche. 
+
+in ogni caso vediamo ora graficamente un interpolazione dei residui con il solito comando persp e procediamo lo stesso con l'analisi, per quanto nulla è stato soddisfacente a sostenere le ipotesi di base del previsore kriging, sceglieremo il trend di secondo ordine in quanto fra tutti aveva i risultati migliori e meno lineari degli altri.
+
+
+
+```{r}
+par(mfrow=c(1,2),mar=c(0.1,0.1,1,0.1),pty='s')
+
+
+#primo
+res.interpolazione<-interp(datadef$coords[,1],datadef$coords[,2],trend.fit1$res)
+persp(res.interpolazione$x,res.interpolazione$y,res.interpolazione$z,xlab="x",ylab="y",zlab='residuals',theta=80,
+      phi=15, expand=0.3, col = color[facetcol],ltheta = 20,  shade = 0.3, ticktype = "simple",
+      main="primo",box=TRUE)
+
+
+#terzo
+res.interpolazione<-interp(datadef$coords[,1],datadef$coords[,2],trend.fit3$res)
+persp(res.interpolazione$x,res.interpolazione$y,res.interpolazione$z,xlab="x",ylab="y",zlab='residuals',theta=80,
+      phi=15, expand=0.3, col = color[facetcol],ltheta = 20,  shade = 0.3, ticktype = "simple",
+      main="terzo",box=TRUE)
+
+par(mfrow=c(1,1),mar=c(0.1,0.1,1,0.1))
+
+#secondo
+res.interpolazione<-interp(datadef$coords[,1],datadef$coords[,2],trend.fit2$res)
+persp(res.interpolazione$x,res.interpolazione$y,res.interpolazione$z,xlab="x",ylab="y",zlab='residuals',theta=100,
+      phi=5, expand=0.3, col = color[facetcol],ltheta = 20,  shade = 0.3, ticktype = "simple",
+      main="secondo",box=TRUE)
+
+
+```
+
+effettivamente, per quanto non soddisfacente, il fit quadratico sembra aver colto meglio degli altri il trend di fondo dei nostri dati lasciando soltanto la parte erratica da analizzare.
+
+
+**variogramma**
+
+prima di considerare questa parte di analisi conclusa e per procedere alla fase successiva, vediamo il variogramma dei residui confrontandolo con il variogramma empirico iniziale dei nostri dati.
+
+proviamo a fittare ad occhio una retta al variogramma campionario per vederne l'andamento, il tau rappresenta il nugget, quindi una sorta di intercetta; la varianza la fissiamo a 13, lo scopo infatti è un assestamento su un valore nell'intorno di 16 (visto il grafico). il range lo fissiamo a 18. In questo caso il fit è di un'esponenziale, sottolineo, molto approssimativo.
+
+facciamo lo stesso poi ma tramite funzioni nell'ultimo grafico; fittiamo quindi un exp tramite la funzione lines.variomodel() e anche un tentativo di interpolazione tramite il comando smooth(). Come abbiamo già verificato al crescere delle distante anche smooth() e anche provando varie parametrizzazioni non riesce ad interpolare senza errori notevoli.
+
+```{r}
+
+residuicoord<- data.frame(coord = datadef$coords[,1:2], res_reg = res.secondo)
+residuigeo=as.geodata(residuicoord)
+
+
+d<-seq(0,80,1)
+sig2<-13
+tau2<-3
+rho<-18
+vg.fit<-sig2+tau2-sig2*exp(-d/rho)
+
+
+vario.res<-variog(residuigeo)
+plot(vario.res,main='Variogramma campionario su residui',pch='*', max.dist=80)
+
+
+
+
+cloud1<-variog(datadef)
+plot(cloud1,main='Variogramma campionario',pch='*', max.dist=80)
+lines(vg.fit)
+
+#stima tramite comandi
+variog1 <- variog(datadef,uvec = seq(0,100,l=10))
+plot(variog1)
+lines.variomodel(cov.model = "exp", cov.pars = c(15,20), nugget = 3, max.dist =80,  lwd = 3)
+smooth <- variog(datadef, option = "smooth", max.dist = 100, n.points = 60, kernel = "normal", band = 1)
+lines(smooth, type ="l", lty = 2)
+
+
+```
+
+il variogramma dei residui comunque sembra mostrare un'andamento correlato seppure minimo e tende a stabilizzarsi dopo la distanza pari a 20 sul grafico, come già spiegato precedentemente non faremo troppo affidamento sui valori a distanze troppo elevate
+
+# Stima modelli di covarianza
+
+
+da premettere che questa stima si applica sull'ipotesi di normalità dei dati in quanto utilizza la stima di massima verosimiglianza;
+
+per inizializzare la procedura e osservando il variogramma diamo il valore dell'assestamento, quindi la sella, pari a 2 e il range $\phi$ a 10, molteplici valori provati hanno sempre dato soluzioni molto simili.
+
+stimiamo più modelli, il gaussiano è lasciato come commento in quanto da errore nel calcolo e la procedura si interrompe.
+
+nella matern lasciamo alla funzione la possibilità di stimare il kappa in entrambi i casi provati.
+
+il nugget (quindi l'errore di misura) è lasciato su false nelle prime stime, sarà quindi la funzione a stimarlo e poi successivamente è fissato a 2, valore verosimile osservando il variogramma e confermato anche dai successivi risultati stimati.
+
+andremo perciò a stimare 6 modelli per poi valutarli:
+
+
+```{r}
+
+stimacov.sferico<-likfit(datadef,ini.cov.pars=c(2,10), cov.model="spherical",trend="2nd",fix.nugget=FALSE)
+#stimacov.gaus<-likfit(datadef,ini.cov.pars=c(2,10), cov.model="gaussian",trend="2nd",fix.nugget=FALSE)
+stimacov.exp<-likfit(datadef,ini.cov.pars=c(2,10), cov.model="exponential",trend="2nd",fix.nugget=FALSE)
+stimacov.mat<-likfit(datadef,ini.cov.pars=c(2,10), cov.model="matern",trend="2nd",fix.nugget=FALSE, fix.kappa = FALSE)
+
+stimacov.sferico2<-likfit(datadef,ini.cov.pars=c(2,10), cov.model="spherical",trend="2nd",fix.nugget=TRUE, nugget=2)
+stimacov.exp2<-likfit(datadef,ini.cov.pars=c(18,10), cov.model="exponential",trend="2nd",fix.nugget=TRUE, nugget=2)
+stimacov.mat2<-likfit(datadef,ini.cov.pars=c(18,10), cov.model="matern",trend="2nd",fix.nugget=TRUE, nugget=2, fix.kappa = FALSE)
+
+
+
+
+#parametri nugget stimato
+stimacov.sferico
+stimacov.exp
+stimacov.mat
+
+#parametri nugget fissato
+stimacov.sferico2
+stimacov.exp2
+stimacov.mat2
+```
+
+a titolo esplorativo e dato il fatto che con l'assenza di normalità la stima di massima verosimiglianza non è adatta, ho provato ad utilizzare la funzione variofit() che permette di utilizzare una stima OLS o WLS per lo stesso scopo. 
+
+l'incertezza sulla parametrizzazione da utilizzare nella funzione e sui risultati stessi con varie prove fatte, mi ha portato a continuare utilizzando il comando precedentemente visto.
+
+```{r}
+wls<-variofit(cloud1,ini.cov.pars=c(2,10), cov.model="exponential",fix.nugget=TRUE, nugget=2)
+wls
+```
+
+
+
+prima di procedere al kriging vero e proprio effettuando le nostre previsioni e visualizzandole sulla griglia, facciamo una procedura di cross-validazione "leave one out" di previsione sui 6 modelli appena stimati per fare la migliore scelta in base all'MSE che ricaviamo dall'oggetto restituito dalla cv.
+
+Da premettere che questo comando effettua già una previsione e potremo visualizzarla con i plot, lo utilizzeremo comunque soltanto per validare e scegliere la funzione di covarianza migliore in base all'MSE per poi continuare con l'analisi e quindi con l'utilizzo della funzione per il kriging come visto in aula.
+
+## Cross-Validazione Leave One Out
+
+```{r}
+#gruppo nugget stimato
+cv.test1<-xvalid(datadef,model = stimacov.sferico)
+cv.test2<-xvalid(datadef,model = stimacov.exp)
+cv.test3<-xvalid(datadef,model = stimacov.mat)
+
+
+#gruppo nugget fissato
+cv.test4<-xvalid(datadef,model=stimacov.sferico2)
+cv.test5<-xvalid(datadef,model=stimacov.exp2)
+cv.test6<-xvalid(datadef,model=stimacov.mat2)
+
+
+
+mse1<-sum((cv.test1$error)^2)/length(cv.test1$data)
+mse1
+
+mse2<-sum((cv.test2$error)^2)/length(cv.test1$data)
+mse2
+
+mse3<-sum((cv.test3$error)^2)/length(cv.test1$data)
+mse3
+
+mse4<-sum((cv.test4$error)^2)/length(cv.test1$data)
+mse4
+
+mse5<-sum((cv.test5$error)^2)/length(cv.test1$data)
+mse5
+
+mse6<-sum((cv.test6$error)^2)/length(cv.test1$data)
+mse6
+
+
+
+
+
+tabellamse<-data.frame(modelli=c('sferico','exp','mat','sferico nugg fixed', 'exp nugget fixed', 'mat nugget fix'), MSE=c(mse1,mse2,mse3,mse4,mse5,mse6))
+
+library(kableExtra)
+tabellamse %>%
+  kbl() %>%
+  kable_material_dark()
+
+
+```
+
+se fissiamo il nugget i modelli che ci danno il miglior risultato sono l'esponenziale e il matern, per quanto i risultati siano simili al nugget stimato dalla funzione.
+
+utilizziamo perciò l'esponenziale col nugget fissato a 2.
+
+\
+\
+
+vediamo prima però una rappresentazione dei 2 risultati ottenuti con la cross validation per il modello esponenziale.
+
+```{r}
+print("esponenziale")
+par.ori<-par(no.readonly = TRUE)
+par(mfcol=c(3,2), mar=c(2.3,2.3,.5,.5),mgp=c(1.3,.6,0))
+plot(cv.test2, error = FALSE, ask = FALSE)
+
+
+
+print("esponenziale nugget fixed")
+par.ori<-par(no.readonly = TRUE)
+par(mfcol=c(3,2), mar=c(2.3,2.3,.5,.5),mgp=c(1.3,.6,0))
+plot(cv.test5, error = FALSE, ask = FALSE)
+
+
+
+```
+
+si vede come i risultati siano praticamente equivalenti
+
+
+# Griglia
+
+creiamo adesso la nostra griglia di coordinate sulla quale andare a fare la previsione. 
+
+iniziamo partendo da "xgrid" e "ygrid" definite precedentemente.
+
+
+```{r}
+griglia<-list(x=xgrid,y=ygrid)
+
+griglia$xr <- range(griglia$x)
+griglia$xs <- griglia$xr[2] - griglia$xr[1]
+griglia$yr <- range(griglia$y)
+griglia$ys <- griglia$yr[2] - griglia$yr[1]
+griglia$xy <- data.frame(cbind(c(matrix(griglia$x, length(griglia$x), length(griglia$y))),
+                   c(matrix(griglia$y, length(griglia$x), length(griglia$y), byrow=T))))
+colnames(griglia$xy) <- c("x", "y")
+locations<-griglia$xy
+
+```
+
+
+
+# **Kriging**
+
+## previsione
+
+arriviamo al cuore della nostra analisi, dobbiamo premettere che nella cross-validazione fatta precedentemente abbiamo già predetto dei valori con la "leave one out cv" utilizzando la funzione xvalid(), in ogni caso vediamo i passi seguiti a lezione; il comando krige.control ci permette di applicare per l'appunto il kriging.
+
+tra le opzioni selezioniamo "ok" che sta per ordinary kriging, gli passiamo però le informazioni per il trend "2nd" ipotizzando come detto un trend del secondo ordine. trend.d fa riferimento al trend sui dati veri, trend.l al trend sui dati predetti, per questo è necessario che nello scrivere il comando siano uguali. Come detto poi il modello di covarianza che utilizziamo è l'esponenziale stimato poco fa.
+
+con krig.conv() infine facciamo la previsione sulla griglia definita precedentemente.
+
+
+```{r}
+krig<-krige.control(type.krige='ok',cov.pars=stimacov.exp2$cov.pars,
+cov.model="exponential",trend.d="2nd",trend.l="2nd")
+
+
+krigprev<-krige.conv(datadef,locations=locations,krige=krig)
+
+```
+
+andiamo adesso a rappresentare la nostra previsione:
+
+il nostro dato predetto lo ritroviamo sia sul comando image che sul comando contour,
+
+l'immagine ci permette di visualizzare graficamente il valore del dato a seconda dei colori, possiamo notare come le zone dove abbiamo più siti, indicanti tipicamente aree con densità di popolazione più alta hanno valori maggiori del nostro dato.
+
+```{r}
+library(yogitools)
+
+plot(griglia$xy, type="n",xlab="x",ylab="y", xlim=c(griglia$xr[1], griglia$xr[2]),
+                      ylim=c(griglia$yr[1], griglia$yr[2]))
+
+image(griglia$x,griglia$y,matrix(krigprev$pred,length(griglia$x),length(griglia$y)), col=heat.colors(80), add=T)
+
+
+contour(griglia$x,griglia$y,matrix(krigprev$pred,length(griglia$x),length(griglia$y)),add=T)
+
+legend("topright", legend=c("min", "ave", "max"),
+       fill=heat.colors(3)) 
+
+points(datadef$coords[,1],datadef$coords[,2],pch=20)
+
+
+title("Kriging Universale")
+
+
+```
+
+## varianza di previsione
+
+in questo grafico invece prendiamo la varianza, ne facciamo la radice e rappresentiamo perciò l'errore quadratico medio, possiamo notare come valori minimi sono nella vicinanza dei siti.
+
+in questo caso la heatmap è uguale alla precedente e il dato relativo all'errore lo ritroviamo sui contour, è evidente come l'errore risulti basso nella vicinanza e nell'intorno dei siti mentre risulti crescente all'allontanarsi da essi. 
+
+```{r}
+
+
+se<-sqrt(krigprev$krige.var)
+
+
+plot(griglia$xy, type="n",xlab="x",ylab="y", xlim=c(griglia$xr[1], griglia$xr[2]),
+          ylim=c(griglia$yr[1], griglia$yr[2]))	
+
+image(griglia$x,griglia$y,matrix(krigprev$pred,length(griglia$x),length(griglia$y)), col=heat.colors(80), add=T)
+
+
+contour(griglia$x,griglia$y,matrix(se,length(griglia$x),length(griglia$y)),add=T,nlevels=14)
+
+legend("topright", legend=c("max", "ave", "min"),
+       fill=heat.colors(3))
+
+points(datadef$coords[,1],datadef$coords[,2],pch=20)
+
+title("Errore quadratico medio")
+
+
+```
+
+## confronto
+
+un ultimo grafico che mette a confronto, sempre con il comando persp e il predittore spline, la ricostruzione del kriging rispetto alla ricostruzione dei dati inziali
+
+```{r}
+par(mfrow=c(1,2),pty='s')
+
+persp(data.interpolazione$x,data.interpolazione$y,data.interpolazione$z,xlab="x",ylab="y",zlab="",theta=80,
+      phi=23,expand=0.3, col=color[facetcol],ltheta = 20, shade = 0.2, ticktype = "simple",
+      main="Perspective plot",box=TRUE)
+
+
+
+persp(griglia$x,griglia$y,matrix(krigprev$pred,length(griglia$x),length(griglia$y)),xlab="x",ylab="y",zlab='z',theta=80,
+phi=17,expand=0.3, col=color[facetcol],ltheta = 20, shade = 0.75, ticktype = "simple",
+main="Kriging universale",box=TRUE)
+```
+possiamo vedere che abbiamo perso qualche picco, la ricostruzione non è eccellente e ce ne siamo accorti anche da tutte le ipotesi verificate e considerate sui dati, tutto sommato il cuore della variabità dei nostri dati iniziali sembra esser stata più o meno colta, avremmo preferito comunque un risultato migliore.
+
+
+
+# Mappa Reale
+
+facciamo adesso una prova non su una griglia definita come sopra ma direttamente sulla mappa del territorio americano, la premessa è che avendo a disposizione delle coordinate relative ad alcune zone dell'Alaska (sicuramente importanti a livello scientifico) ed anche di alcune isole come le Hawaii, siamo costretti ad estendere la mappa della zona di osservazione per comprendere tutti i siti a disposizione, possiamo ignorare gli estremi sul lato nord, il Canada in particolae, zone eccessivamente lontane dai siti a disposizione e per le quali non abbiamo dati e per questo previsioni non affidabili. 
+
+creiamo la griglia con il valore delle coordinate, rimuoviamo i punti negli spazi vuoti e rappresentiamo la mappa per intero delimitata dalle coordinate scelte.
+
+```{R}
+
+library(maps)
+
+
+s01 <- seq(-170,-60,1)
+s02 <- seq(10,70,1)
+s0  <- as.matrix(expand.grid(s01,s02))
+
+
+
+inusa <- map.where("world",s0[,1],s0[,2])
+s0    <- s0[!is.na(inusa),]
+
+
+map("world", xlim = c(-180, -60), ylim = c(10, 70))
+points(s0,pch=19,cex=0.1)
+
+```
+
+Non abbiamo bisogno di ristimare il predittore ma soltanto di applicare la previsione a questa nuova griglia
+
+```{r}
+
+krigprev1<-krige.conv(datadef,locations=s0,krige=krig)
+
+```
+
+rappresentazione dei siti con il dato reale
+
+
+
+```{r}
+siti1 <- data.frame(long=datadef$coord[,1],lat=datadef$coord[,2],Y=datadef$data)
+ggplot(siti1, aes(long, lat)) +
+  borders("world", xlim = c(-155, -80), ylim = c(10, 70)) +
+  geom_point(aes(colour = Y)) +
+  scale_colour_gradientn(colours = terrain.colors(10)) +
+  xlab("")+ylab("")+labs(title="PM 2.5, 2000")+
+  coord_fixed()
+
+par(mfrow=c(1,2),pty='s')
+```
+
+rappresentazione della previsione.
+
+```{r}
+
+prev1 <-data.frame(long=s0[,1],lat=s0[,2],Y=krigprev1$pred)
+ggplot(prev1, aes(long, lat)) +
+  borders("world", xlim = c(-155, -80), ylim = c(10, 70)) +
+  geom_raster(aes(fill = Y)) +
+  scale_fill_gradientn(colours = terrain.colors(10))+
+  xlab("")+ylab("")+labs(title="PM 2.5,previsione 2000")+
+  coord_fixed()
+
+
+
+```
+
+come prima possiamo osservare la varianza dell'errore e come prima possiamo vedere che allontanandoci dai siti a disposizione l'errore risulta molto più alto
+
+```{r}
+se<-sqrt(krigprev1$krige.var)
+# Plot Kriging VARIANCE
+se1 <- data.frame(long=s0[,1],lat=s0[,2],Y=se)
+ggplot(se1, aes(long, lat)) +
+  borders("world", xlim = c(-155, -80), ylim = c(10, 70)) +
+  geom_raster(aes(fill = Y)) +
+  scale_fill_gradientn(colours = terrain.colors(10))+
+  xlab("")+ylab("")+labs(title="PM 2.5,varianza errore, 2000")+
+  coord_fixed()
+
+
+```
+
+# *Prove ulteriori "superflue"*
+
+Fino ad ora abbiamo visto modelli nei quali stimiamo e fissiamo una parametrizzazione che cerchiamo noi, ottimale per il kriging, l'approccio Bayesiano prende invece in considerazione l'incertezza nei parametri.
+
+Lo scopo dell'approccio è limitare quelle assunzioni di base che possiamo definire forti e che spesso non ritroviamo nei nostri dati: l'assunzione che il processo sia stazionario (stazionarietà in senso debole cioè in media e in varianza), l'assunzione che i dati si distribuiscano in maniera normale, l'assunzione appunto che ci sia un modello di covarianza scelto e definito.
+
+la procedura è iterativa e prevede di stimare inizialmente il variogramma dai dati, ripetendo poi la stima in ogni sito di osservazione, porta quindi alla generazione di molti variogrammi, diversi, che avranno perciò una parametrizzazione diversa. Secondo la Baeysian Rule si calcola un "peso" da dare a questo nuovo variogramma stimato. In ogni sito perciò si ripetono gli step in maniera iterativa.
+
+il processo porta ad ottenere quindi uno spettro di variogrammi che sono una stima del vero variogramma del processo osservato "delimitato" da degli intervalli di confidenza. 
+
+Ho provato ad applicare due serie di comandi ma senza successo, il primo "prepara" prima i dati necessari all'effettivo kriging baesyano: vediamo la definizione del trend, del kappa e il prior.control(), cioè parametrizzazione per la stima di molteplici $\phi$, lo stesso per il $\tau$
+
+il comando restituisce errore perciò l'ho lasciato commentato.
+
+nel secondo caso invece usando una parametrizzazione più semplice dello stesso comando arriviamo a dei risultati ma controllando l'oggetto, i plot e i risultati stessi, sono inconcludenti.
+
+Ho visto che l'argomento è molto ampio e necessita di migliore comprensione, lo approfondirò ma in ogni caso ho preferito lasciare questo tentativo sulla tesina.
+
+```{r}
+set.seed(268)
+
+
+MC=model.control(trend.d="2nd",trend.l
+="2nd",kappa=1.5)
+
+PC=prior.control(phi.discrete=seq(0,6,l=21),
+phi.prior="reciprocal",
+
+tausq.rel.prior="unif",tausq.rel.discrete
+=seq(0,1,l=11))
+OC=output.control(n.post=5000,moments=T)
+
+
+#kb1 = krige.bayes(datadef,loc=griglia,model=MC,prior=PC,output=OC)
+
+
+```
+```{r}
+
+
+kb2<- krige.bayes(datadef, loc = griglia, prior = prior.control(phi.discrete = seq(0,5,l=101), phi.prior="rec"), output=output.control(n.post=5000))
+
+
+```
+
+
+
+
+
+
+
+
